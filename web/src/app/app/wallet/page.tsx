@@ -4,7 +4,7 @@ import type { AppKit } from "@circle-fin/app-kit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDownUp, ArrowUpRight, Check, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { type EIP1193Provider, formatUnits, parseUnits } from "viem";
+import { type EIP1193Provider, type Hex, decodeFunctionData, encodeFunctionData, erc20Abi, formatUnits, parseAbi, parseUnits } from "viem";
 import { useConnection, useReadContract, useSwitchChain } from "wagmi";
 import { SWAP_TOKENS, type SwapToken, isAmount } from "@/lib/circle";
 import type { Network } from "@/lib/networks";
@@ -17,7 +17,33 @@ import { CountUp, Title, Wallet, btn, btnGhost, field, label } from "../ui";
 let kit: Promise<AppKit> | undefined;
 const getKit = () => (kit ??= import("@circle-fin/app-kit").then(({ AppKit }) => new AppKit()));
 const makeAdapter = async (provider: EIP1193Provider) =>
-  (await import("@circle-fin/adapter-viem-v2")).createViemAdapterFromProvider({ provider });
+  (await import("@circle-fin/adapter-viem-v2")).createViemAdapterFromProvider({ provider: plainApprovals(provider) });
+
+const increaseAllowanceAbi = parseAbi(["function increaseAllowance(address spender, uint256 addedValue)"]);
+
+/**
+ * Circle's kits approve USDC with increaseAllowance(), which OKX and other wallets block as a risky signature type.
+ * Rewrite it to the equivalent approve(spender, current + added) on the way to the wallet: same resulting allowance,
+ * but a plain approval every wallet shows clearly.
+ */
+function plainApprovals(provider: EIP1193Provider): EIP1193Provider {
+  const request = (async (args: { method: string; params?: unknown }) => {
+    const tx = (args.method === "eth_sendTransaction" && (args.params as { data?: Hex; to?: Hex; from?: Hex }[] | undefined)?.[0]) || undefined;
+    if (tx?.data?.startsWith("0x39509351") && tx.to && tx.from) {
+      const { args: [spender, added] } = decodeFunctionData({ abi: increaseAllowanceAbi, data: tx.data });
+      const current = BigInt(
+        (await provider.request({
+          method: "eth_call",
+          params: [{ to: tx.to, data: encodeFunctionData({ abi: erc20Abi, functionName: "allowance", args: [tx.from, spender] }) }, "latest"],
+        })) as Hex,
+      );
+      const data = encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [spender, current + added] });
+      return provider.request({ method: "eth_sendTransaction", params: [{ ...tx, data }] } as never);
+    }
+    return provider.request(args as never);
+  }) as EIP1193Provider["request"];
+  return { ...provider, request, on: provider.on.bind(provider), removeListener: provider.removeListener.bind(provider) };
+}
 
 const tokenAddress = (net: Network, t: SwapToken) => (t === "USDC" ? USDC : net.eurc);
 
