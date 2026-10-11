@@ -151,7 +151,14 @@ function SwapPanel() {
   const adapter = async () => makeAdapter((await connector!.getProvider()) as EIP1193Provider);
   // "approve" = an on-chain approval for exactly this amount, instead of an off-chain permit signature.
   // Wallets (MetaMask/Blockaid) flag permit signatures from new sites as high-risk; a plain approve reads clearly.
-  const request = (amountIn: string) => ({ tokenIn, tokenOut, amountIn, config: { slippageBps: 100, allowanceStrategy: "approve" as const } });
+  // batchTransactions: false = approve and swap as two normal transactions. Batching (EIP-5792) makes some wallets
+  // ask for an EIP-7702 "smart account" authorization, which several wallets block as a risky signature type.
+  const request = (amountIn: string) => ({
+    tokenIn,
+    tokenOut,
+    amountIn,
+    config: { slippageBps: 100, allowanceStrategy: "approve" as const, batchTransactions: false },
+  });
 
   // live quote: refetches as you type (debounced) and every 15s while visible
   const quote = useQuery({
