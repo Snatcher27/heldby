@@ -20,4 +20,4 @@
 - AI: open-source `openai/gpt-oss-120b` on Groq
 
 ## Source
-- [GitHub repository](https://github.com/anshxft/heldby)
+- [GitHub repository](https://github.com/Snatcher27/heldby)

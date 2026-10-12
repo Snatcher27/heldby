@@ -6,6 +6,6 @@ export const SITE_URL = process.env.VERCEL_PROJECT_PRODUCTION_URL
 export const SITE_NAME = "Heldby";
 export const SITE_DESCRIPTION =
   "USDC escrow on Arc. Lock payment in a smart contract; an AI agent checks the work against the brief and releases it. No middleman.";
-export const REPO_URL = "https://github.com/anshxft/heldby";
+export const REPO_URL = "https://github.com/Snatcher27/heldby";
 /** Public contact: GitHub issues (no personal email on the site). */
 export const CONTACT_URL = `${REPO_URL}/issues`;
